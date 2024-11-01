@@ -24,11 +24,14 @@ void motors_init(void)
 
 void motors_set(float x, float y, float theta)
 {
-    float m1, m2, m3;
+    float norm = sqrtf(x * x + y * y);
+    float scale = norm > 1.f ? 1.f / norm : 1.f;
+    x *= scale;
+    y *= scale;
 
-    m1 = -theta - x;
-    m2 = -theta + 0.5f * x + sinf(M_PI / 3.f) * y;
-    m3 = -theta + 0.5f * x - sinf(M_PI / 3.f) * y;
+    float m1 = -theta - x;
+    float m2 = -theta + 0.5f * x + sinf(M_PI / 3.f) * y;
+    float m3 = -theta + 0.5f * x - sinf(M_PI / 3.f) * y;
 
     CLAMP(m1, -1.f, 1.f);
     CLAMP(m2, -1.f, 1.f);
