@@ -66,8 +66,8 @@ static void decide_direction(float *x, float *y, const uint32_t *pulse_lengths_u
 
     float cxx = cx * cosf(-(angle - ((float) M_PI_2))) - cy * sinf(-(angle - ((float) M_PI_2)));
 
-    *x = cosf(angle) * 0.4f + cxx * cosf(angle - ((float) M_PI_2)) * 1.0f;
-    *y = sinf(angle) * 0.4f + cxx * sinf(angle - ((float) M_PI_2)) * 1.0f;
+    *x = cosf(angle) * 0.4f + cxx * cosf(angle - ((float) M_PI_2)) * 0.5f;
+    *y = sinf(angle) * 0.4f + cxx * sinf(angle - ((float) M_PI_2)) * 0.5f;
 }
 
 int main()
@@ -76,9 +76,7 @@ int main()
     watchdog_enable(100, 1);
 #endif
 
-#ifdef DEBUG
     stdio_init_all();
-#endif
 
     if (watchdog_caused_reboot())
     {
