@@ -7,10 +7,12 @@
 
 #include "motors.h"
 #include "sensors.h"
+#include "bootsel_button.h"
 
-#define DEBUG
+// #define DEBUG
 
-#define LED_PIN (PICO_DEFAULT_LED_PIN)
+#define SENSOR_OVERSAMPLING 2
+#define SENSOR_THRESHOLD 400
 
 static void decide_direction(float *x, float *y, const uint32_t *pulse_lengths_us)
 {
@@ -19,8 +21,8 @@ static void decide_direction(float *x, float *y, const uint32_t *pulse_lengths_u
     int right_idx = last_direction_idx;
     for (int i = 0; i < APP_NUM_SENSORS / 2 - 1; i++)
     {
-        int left_state = pulse_lengths_us[left_idx] > 500 ? 1 : 0;
-        int right_state = pulse_lengths_us[right_idx] > 500 ? 1 : 0;
+        int left_state = pulse_lengths_us[left_idx] > SENSOR_THRESHOLD ? 1 : 0;
+        int right_state = pulse_lengths_us[right_idx] > SENSOR_THRESHOLD ? 1 : 0;
 
         if (left_state)
         {
@@ -64,15 +66,19 @@ static void decide_direction(float *x, float *y, const uint32_t *pulse_lengths_u
 
     float cxx = cx * cosf(-(angle - ((float) M_PI_2))) - cy * sinf(-(angle - ((float) M_PI_2)));
 
-    *x = cosf(angle) * 0.4f + cxx * cosf(angle - ((float) M_PI_2)) * 0.7f;
-    *y = sinf(angle) * 0.4f + cxx * sinf(angle - ((float) M_PI_2)) * 0.7f;
+    *x = cosf(angle) * 0.4f + cxx * cosf(angle - ((float) M_PI_2)) * 1.0f;
+    *y = sinf(angle) * 0.4f + cxx * sinf(angle - ((float) M_PI_2)) * 1.0f;
 }
 
 int main()
 {
-    // watchdog_enable(100, 1);
+#ifndef DEBUG
+    watchdog_enable(100, 1);
+#endif
 
+#ifdef DEBUG
     stdio_init_all();
+#endif
 
     if (watchdog_caused_reboot())
     {
@@ -81,9 +87,6 @@ int main()
 
     motors_init();
     sensors_init();
-    gpio_init(LED_PIN);
-    gpio_set_dir(LED_PIN, GPIO_OUT);
-    gpio_put(LED_PIN, 1);
 
     uint32_t pulse_lengths_us_1[APP_NUM_SENSORS] = {0};
     uint32_t pulse_lengths_us[APP_NUM_SENSORS] = {0};
@@ -91,14 +94,47 @@ int main()
     float x = 0.0f;
     float y = 0.0f;
 
+    printf("Waiting for button press...\n");
+
+    while (!bootsel_button_get())
+    {
+        sleep_ms(10);
+        watchdog_update();
+    }
+
+    while (bootsel_button_get())
+    {
+        sleep_ms(10);
+        watchdog_update();
+    }
+
+    printf("Button pressed!\n");
+
+    for (int i = 0; i < 20; i++)
+    {
+        sleep_ms(50);
+        watchdog_update();
+    }
+
     for (;;)
     {
-        // sensors_read(pulse_lengths_us);
+        watchdog_update();
+        if (bootsel_button_get())
+        {
+            printf("Stopping...\n");
+            motors_set(0.0f, 0.0f, 0.0f);
+            for (int i = 0; i < 20; i++)
+            {
+                sleep_ms(50);
+                watchdog_update();
+            }
+            for (;;);
+        }
         for (int i = 0; i < APP_NUM_SENSORS; i++)
         {
             pulse_lengths_us[i] = 0;
         }
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < SENSOR_OVERSAMPLING; i++)
         {
             sensors_read(pulse_lengths_us_1);
             for (int j = 0; j < APP_NUM_SENSORS; j++)
@@ -111,14 +147,17 @@ int main()
         }
         decide_direction(&x, &y, pulse_lengths_us);
         motors_set(x, y, 0.0f);
-        // printf("x: %f\ty: %f\n", x, y);
-        // printf("Pulse lengths:\n");
-        // for (int i = 0; i < APP_NUM_SENSORS; i++)
-        // {
-        //     printf(" %d: %u us\n", i, pulse_lengths_us[i]);
-        // }
-        // printf("\n");
-        // sleep_ms(100);
+
+#ifdef DEBUG
+        printf("x: %f\ty: %f\n", x, y);
+        printf("Pulse lengths:\n");
+        for (int i = 0; i < APP_NUM_SENSORS; i++)
+        {
+            printf(" %d: %u us\n", i, pulse_lengths_us[i]);
+        }
+        printf("\n");
+        sleep_ms(100);
+#endif
     }
 
     return 0;

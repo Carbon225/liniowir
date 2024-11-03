@@ -11,6 +11,7 @@ add_executable(main
     ${CMAKE_CURRENT_LIST_DIR}/src/sensors.c
     ${CMAKE_CURRENT_LIST_DIR}/src/motoron/Motoron.cpp
     ${CMAKE_CURRENT_LIST_DIR}/src/motoron/motoron_c.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/src/bootsel_button.c
 )
 target_link_libraries(main pico_stdlib hardware_watchdog hardware_pwm hardware_gpio hardware_i2c)
 pico_enable_stdio_usb(main 1)
