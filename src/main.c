@@ -11,6 +11,9 @@
 
 // #define DEBUG
 
+#define DISABLE_WITH_BUTTON 0
+#define DISABLE_IN_THE_AIR 1
+
 #define SENSOR_OVERSAMPLING 2
 #define SENSOR_THRESHOLD 400
 
@@ -117,6 +120,8 @@ int main()
     for (;;)
     {
         watchdog_update();
+
+#if DISABLE_WITH_BUTTON
         if (bootsel_button_get())
         {
             printf("Stopping...\n");
@@ -128,6 +133,8 @@ int main()
             }
             for (;;);
         }
+#endif
+
         for (int i = 0; i < APP_NUM_SENSORS; i++)
         {
             pulse_lengths_us[i] = 0;
@@ -143,6 +150,30 @@ int main()
                 }
             }
         }
+
+#if DISABLE_IN_THE_AIR
+        bool in_the_air = true;
+        for (int i = 0; i < APP_NUM_SENSORS; i++)
+        {
+            if (pulse_lengths_us[i] < 1000)
+            {
+                in_the_air = false;
+                break;
+            }
+        }
+        if (in_the_air)
+        {
+            printf("Stopping...\n");
+            motors_set(0.0f, 0.0f, 0.0f);
+            for (int i = 0; i < 20; i++)
+            {
+                sleep_ms(50);
+                watchdog_update();
+            }
+            for (;;);
+        }
+#endif
+
         decide_direction(&x, &y, pulse_lengths_us);
         motors_set(x, y, 0.0f);
 
