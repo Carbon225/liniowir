@@ -4,9 +4,11 @@
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 #include "hardware/watchdog.h"
+#include "hardware/i2c.h"
 
 #include "motors.h"
 #include "sensors.h"
+#include "imu.h"
 #include "bootsel_button.h"
 
 // #define DEBUG
@@ -14,7 +16,7 @@
 #define DISABLE_WITH_BUTTON 0
 #define DISABLE_IN_THE_AIR 1
 
-#define SENSOR_OVERSAMPLING 2
+#define SENSOR_OVERSAMPLING 3
 #define SENSOR_THRESHOLD 400
 
 static void decide_direction(float *x, float *y, const uint32_t *pulse_lengths_us)
@@ -76,18 +78,30 @@ static void decide_direction(float *x, float *y, const uint32_t *pulse_lengths_u
 int main()
 {
 #ifndef DEBUG
-    watchdog_enable(100, 1);
+    watchdog_enable(8000, 1);
 #endif
 
     stdio_init_all();
+
+#ifdef DEBUG
+    while (!stdio_usb_connected())
+    {
+        sleep_ms(10);
+    }
+#endif
 
     if (watchdog_caused_reboot())
     {
         printf("Watchdog caused reboot\n");
     }
 
+    i2c_init(i2c_default, 400000);
+    gpio_set_function(0, GPIO_FUNC_I2C);
+    gpio_set_function(1, GPIO_FUNC_I2C);
+
     motors_init();
     sensors_init();
+    imu_init();
 
     uint32_t pulse_lengths_us_1[APP_NUM_SENSORS] = {0};
     uint32_t pulse_lengths_us[APP_NUM_SENSORS] = {0};
@@ -135,6 +149,9 @@ int main()
         }
 #endif
 
+        imu_data_t imu_data;
+        imu_read(&imu_data);
+
         for (int i = 0; i < APP_NUM_SENSORS; i++)
         {
             pulse_lengths_us[i] = 0;
@@ -174,8 +191,20 @@ int main()
         }
 #endif
 
+#ifdef DEBUG
+        printf("\n");
+        printf("Gyr:\n %f\n %f\n %f\n", imu_data.gx, imu_data.gy, imu_data.gz);
+        printf("Acc:\n %f\n %f\n %f\n", imu_data.ax, imu_data.ay, imu_data.az);
+        printf("Mag:\n %f\n %f\n %f\n", imu_data.mx, imu_data.my, imu_data.mz);
+        printf("RPY:\n %f\n %f\n %f\n", imu_data.roll, imu_data.pitch, imu_data.yaw);
+        printf("\n");
+#endif
+
+        float yaw_err = 180.0f - imu_data.yaw;
+        float turn_cmd = yaw_err * 0.01f;
+
         decide_direction(&x, &y, pulse_lengths_us);
-        motors_set(x, y, 0.0f);
+        motors_set(x, y, turn_cmd);
 
 #ifdef DEBUG
         printf("x: %f\ty: %f\n", x, y);

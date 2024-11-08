@@ -15,15 +15,13 @@ static motoron_t motoron;
 
 void motors_init(void)
 {
-    i2c_init(i2c_default, 400000);
-    gpio_set_function(0, GPIO_FUNC_I2C);
-    gpio_set_function(1, GPIO_FUNC_I2C);
-
     motoron_init(&motoron);
 }
 
 void motors_set(float x, float y, float theta)
 {
+    theta = CLAMP(theta, -0.3f, 0.3f);
+
     float norm = sqrtf(x * x + y * y);
     float scale = norm > 1.f ? 1.f / norm : 1.f;
     x *= scale;
