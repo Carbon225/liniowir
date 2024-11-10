@@ -40,7 +40,7 @@ extern "C" void imu_read(imu_data_t *data)
 
     data->gx = data_raw[0];
     data->gy = data_raw[1];
-    data->gz = data_raw[2];
+    data->gz = data_raw[2] - (99.0f / 120.0f);
 
     data->ax = data_raw[3];
     data->ay = data_raw[4];
