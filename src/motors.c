@@ -20,7 +20,7 @@ void motors_init(void)
 
 void motors_set(float x, float y, float theta)
 {
-    theta = CLAMP(theta, -0.3f, 0.3f);
+    theta = CLAMP(theta, -0.1f, 0.1f);
 
     float norm = sqrtf(x * x + y * y);
     float scale = norm > 1.f ? 1.f / norm : 1.f;
