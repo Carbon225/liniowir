@@ -7,6 +7,8 @@
 #include "mpu9250/mpu9250.h"
 #include "fusion/mahony.h"
 
+#define USE_MAGNETOMETER 0
+
 typedef struct
 {
     MPU9250 mpu;
@@ -48,11 +50,18 @@ extern "C" void imu_read(imu_data_t *data)
     data->my = data_raw[7];
     data->mz = data_raw[8];
 
+#if USE_MAGNETOMETER
     impl->fusion.update(
         data->gx, data->gy, data->gz,
         data->ax, data->ay, data->az,
         data->mx, data->my, data->mz,
         dt);
+#else
+    impl->fusion.updateIMU(
+        data->gx, data->gy, data->gz,
+        data->ax, data->ay, data->az,
+        dt);
+#endif
 
     data->roll = impl->fusion.getRoll();
     data->pitch = impl->fusion.getPitch();

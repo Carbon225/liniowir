@@ -31,9 +31,9 @@ void motors_set(float x, float y, float theta)
     float m2 = -theta + 0.5f * x + sinf(M_PI / 3.f) * y;
     float m3 = -theta + 0.5f * x - sinf(M_PI / 3.f) * y;
 
-    CLAMP(m1, -1.f, 1.f);
-    CLAMP(m2, -1.f, 1.f);
-    CLAMP(m3, -1.f, 1.f);
+    m1 = CLAMP(m1, -1.f, 1.f);
+    m2 = CLAMP(m2, -1.f, 1.f);
+    m3 = CLAMP(m3, -1.f, 1.f);
 
     motoron_set_speed(&motoron, 1, -m1 * MAX_SPEED);
     motoron_set_speed(&motoron, 2, -m2 * MAX_SPEED);

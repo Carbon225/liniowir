@@ -1,10 +1,14 @@
 #include <stdio.h>
 #include <math.h>
 
+#include "FreeRTOS.h"
+#include "task.h"
+
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 #include "hardware/watchdog.h"
 #include "hardware/i2c.h"
+#include "pico/multicore.h"
 
 #include "motors.h"
 #include "sensors.h"
@@ -19,15 +23,19 @@
 #define SENSOR_OVERSAMPLING 3
 #define SENSOR_THRESHOLD 400
 
-int wrap_idx(int idx)
+static int wrap_idx(int idx)
 {
-    return (idx + APP_NUM_SENSORS) % APP_NUM_SENSORS;
+    while (idx < 0)
+    {
+        idx += APP_NUM_SENSORS;
+    }
+    return idx % APP_NUM_SENSORS;
 }
 
 static float get_centroid_around_direction(int direction_idx, const uint32_t *pulse_lengths_us)
 {
     float left = pulse_lengths_us[wrap_idx(direction_idx + 1)];
-    float center = pulse_lengths_us[direction_idx];
+    float center = pulse_lengths_us[wrap_idx(direction_idx)];
     float right = pulse_lengths_us[wrap_idx(direction_idx - 1)];
     if (left < SENSOR_THRESHOLD && center < SENSOR_THRESHOLD && right < SENSOR_THRESHOLD)
     {
@@ -81,7 +89,7 @@ static void decide_direction(float *x, float *y, const uint32_t *pulse_lengths_u
         last_direction_angle += ((float) M_PI) * 2.0f;
     }
 
-    last_direction_idx = (int) roundf(last_direction_angle / ((float) M_PI) / 2.0f * APP_NUM_SENSORS + 14.5f);
+    last_direction_idx = wrap_idx((int) roundf(last_direction_angle / ((float) M_PI) / 2.0f * APP_NUM_SENSORS + 14.5f));
 
     float cx = 0.0f;
     float cy = 0.0f;
@@ -109,34 +117,8 @@ static void decide_direction(float *x, float *y, const uint32_t *pulse_lengths_u
     *y = sinf(angle) * 0.4f + cxx * sinf(angle - ((float) M_PI_2)) * 0.5f;
 }
 
-int main()
+static void core1_main()
 {
-#ifndef DEBUG
-    watchdog_enable(8000, 1);
-#endif
-
-    stdio_init_all();
-
-#ifdef DEBUG
-    while (!stdio_usb_connected())
-    {
-        sleep_ms(10);
-    }
-#endif
-
-    if (watchdog_caused_reboot())
-    {
-        printf("Watchdog caused reboot\n");
-    }
-
-    i2c_init(i2c_default, 400000);
-    gpio_set_function(0, GPIO_FUNC_I2C);
-    gpio_set_function(1, GPIO_FUNC_I2C);
-
-    motors_init();
-    sensors_init();
-    imu_init();
-
     uint32_t pulse_lengths_us_1[APP_NUM_SENSORS] = {0};
     uint32_t pulse_lengths_us[APP_NUM_SENSORS] = {0};
 
@@ -144,6 +126,17 @@ int main()
     float y = 0.0f;
 
     printf("Waiting for button press...\n");
+
+    watchdog_update();
+    motors_set(0.0f, 0.0f, 1.0f);
+    sleep_ms(20);
+
+    watchdog_update();
+    motors_set(0.0f, 0.0f, -1.0f);
+    sleep_ms(20);
+
+    watchdog_update();
+    motors_set(0.0f, 0.0f, 0.0f);
 
     while (!bootsel_button_get())
     {
@@ -174,11 +167,6 @@ int main()
         {
             printf("Stopping...\n");
             motors_set(0.0f, 0.0f, 0.0f);
-            for (int i = 0; i < 20; i++)
-            {
-                sleep_ms(50);
-                watchdog_update();
-            }
             for (;;);
         }
 #endif
@@ -216,11 +204,6 @@ int main()
         {
             printf("Stopping...\n");
             motors_set(0.0f, 0.0f, 0.0f);
-            for (int i = 0; i < 20; i++)
-            {
-                sleep_ms(50);
-                watchdog_update();
-            }
             for (;;);
         }
 #endif
@@ -245,12 +228,63 @@ int main()
         printf("Pulse lengths:\n");
         for (int i = 0; i < APP_NUM_SENSORS; i++)
         {
-            printf(" %d: %u us\n", i, pulse_lengths_us[i]);
+            printf(" %d: %lu us\n", i, pulse_lengths_us[i]);
         }
         printf("\n");
         sleep_ms(100);
 #endif
     }
+}
+
+static void main_task(void *pvParameters)
+{
+    (void)pvParameters;
+    for (;;)
+    {
+        vTaskDelay(portMAX_DELAY);
+    }
+}
+
+int main()
+{
+#ifndef DEBUG
+    watchdog_enable(4000, 0);
+#endif
+
+    stdio_init_all();
+
+#ifdef DEBUG
+    while (!stdio_usb_connected())
+    {
+        sleep_ms(10);
+    }
+#endif
+
+    if (watchdog_caused_reboot())
+    {
+        printf("Watchdog caused reboot\n");
+    }
+
+    i2c_init(i2c_default, 400000);
+    gpio_set_function(0, GPIO_FUNC_I2C);
+    gpio_set_function(1, GPIO_FUNC_I2C);
+
+    motors_init();
+    sensors_init();
+    imu_init();
+
+#ifndef DEBUG
+    watchdog_disable();
+    sleep_ms(10);
+    watchdog_enable(100, 0);
+#endif
+
+    multicore_launch_core1(core1_main);
+
+    static StaticTask_t xTaskBuffer;
+    static StackType_t xStack[configMINIMAL_STACK_SIZE];
+    xTaskCreateStatic(main_task, "MainTask", configMINIMAL_STACK_SIZE, NULL, 1, xStack, &xTaskBuffer);
+    vTaskStartScheduler();
 
     return 0;
 }
