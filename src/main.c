@@ -14,6 +14,7 @@
 #include "sensors.h"
 #include "imu.h"
 #include "bootsel_button.h"
+#include "network/access_point/picow_access_point.h"
 
 // #define DEBUG
 
@@ -281,9 +282,14 @@ int main()
 
     multicore_launch_core1(core1_main);
 
-    static StaticTask_t xTaskBuffer;
-    static StackType_t xStack[configMINIMAL_STACK_SIZE];
-    xTaskCreateStatic(main_task, "MainTask", configMINIMAL_STACK_SIZE, NULL, 1, xStack, &xTaskBuffer);
+    static StaticTask_t main_task_buffer;
+    static StackType_t main_task_stack[configMINIMAL_STACK_SIZE];
+    xTaskCreateStatic(main_task, "MainTask", sizeof(main_task_stack) / sizeof(StackType_t), NULL, 1, main_task_stack, &main_task_buffer);
+
+    static StaticTask_t ap_task_buffer;
+    static StackType_t ap_task_stack[configMINIMAL_STACK_SIZE];
+    xTaskCreateStatic(picow_access_point_task, "APTask", sizeof(ap_task_stack) / sizeof(StackType_t), NULL, 1, ap_task_stack, &ap_task_buffer);
+
     vTaskStartScheduler();
 
     return 0;
