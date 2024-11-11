@@ -16,9 +16,12 @@ add_executable(main
     ${CMAKE_CURRENT_LIST_DIR}/src/fusion/mahony.cpp
     ${CMAKE_CURRENT_LIST_DIR}/src/mpu9250/mpu9250.cpp
     ${CMAKE_CURRENT_LIST_DIR}/src/imu.cpp
+
     ${CMAKE_CURRENT_LIST_DIR}/src/network/access_point/picow_access_point.c
     ${CMAKE_CURRENT_LIST_DIR}/src/network/access_point/dhcpserver/dhcpserver.c
     ${CMAKE_CURRENT_LIST_DIR}/src/network/access_point/dnsserver/dnsserver.c
+
+    ${CMAKE_CURRENT_LIST_DIR}/src/network/httpd/picow_httpd.c
 )
 
 target_include_directories(main PUBLIC ${CMAKE_CURRENT_LIST_DIR}/src/config)
@@ -26,11 +29,17 @@ target_include_directories(main PUBLIC ${CMAKE_CURRENT_LIST_DIR}/src/config)
 target_link_libraries(main
     pico_stdlib
     pico_multicore
+
     hardware_watchdog
     hardware_pwm
     hardware_gpio
     hardware_i2c
+
     pico_cyw43_arch_lwip_sys_freertos
+    pico_lwip_http
+    pico_lwip_mdns
+    pico_freertos_httpd_content
+
     FreeRTOS-Kernel
     FreeRTOS-Kernel-Static
     FreeRTOS-Kernel-Heap4
@@ -47,6 +56,13 @@ target_compile_options(main PUBLIC
     $<$<COMPILE_LANG_AND_ID:C,Clang>:-Weverything>
 
     -Wno-psabi
+)
+
+pico_add_library(pico_freertos_httpd_content NOFLAG)
+pico_set_lwip_httpd_content(pico_freertos_httpd_content INTERFACE
+    ${CMAKE_CURRENT_LIST_DIR}/src/network/httpd/content/404.html
+    ${CMAKE_CURRENT_LIST_DIR}/src/network/httpd/content/index.shtml
+    ${CMAKE_CURRENT_LIST_DIR}/src/network/httpd/content/test.shtml
 )
 
 pico_enable_stdio_usb(main 1)

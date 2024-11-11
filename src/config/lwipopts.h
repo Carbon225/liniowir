@@ -7,16 +7,15 @@
 
 #define NO_SYS                      0
 
-// allow override in some examples
-#ifndef LWIP_SOCKET
-#define LWIP_SOCKET                 0
-#endif
+#define LWIP_SOCKET                 1
+
 #if PICO_CYW43_ARCH_POLL
 #define MEM_LIBC_MALLOC             1
 #else
 // MEM_LIBC_MALLOC is incompatible with non polling versions
 #define MEM_LIBC_MALLOC             0
 #endif
+
 #define MEM_ALIGNMENT               4
 #define MEM_SIZE                    4000
 #define MEMP_NUM_TCP_SEG            32
@@ -98,5 +97,26 @@
 // ping_thread sets socket receive timeout, so enable this feature
 #define LWIP_SO_RCVTIMEO 1
 #endif
+
+// The following is needed to test mDns
+#define LWIP_MDNS_RESPONDER 1
+#define LWIP_IGMP 1
+#define LWIP_NUM_NETIF_CLIENT_DATA 1
+#define MDNS_RESP_USENETIF_EXTCALLBACK  1
+#define MEMP_NUM_SYS_TIMEOUT (LWIP_NUM_SYS_TIMEOUT_INTERNAL + 3)
+#define MEMP_NUM_TCP_PCB 12
+
+// Enable cgi and ssi
+#define LWIP_HTTPD_CGI 1
+#define LWIP_HTTPD_SSI 1
+#define LWIP_HTTPD_SSI_MULTIPART 1
+
+#define HTTPD_FSDATA_FILE "pico_fsdata.inc"
+
+#define LWIP_FREERTOS_CHECK_CORE_LOCKING 1
+#define LWIP_TCPIP_CORE_LOCKING 1
+
+void sys_check_core_locking(void);
+#define LWIP_ASSERT_CORE_LOCKED() sys_check_core_locking()
 
 #endif /* __LWIPOPTS_H__ */
