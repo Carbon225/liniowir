@@ -1,12 +1,123 @@
+<!DOCTYPE html>
 <html>
 <head>
-    <title>Pico httpd example</title>
+    <title>Liniowir</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        h1, h2, h3 {
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+        }
+        form {
+            background: #fff;
+            padding: 20px;
+            margin: 20px auto;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+        }
+        label {
+            display: block;
+            margin: 10px 0 5px;
+        }
+        input[type="text"], input[type="checkbox"] {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .submit-container {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .danger-button {
+            background: #ff0000;
+            color: #fff;
+            border: none;
+            padding: 20px 40px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.5em;
+            font-weight: bold;
+            transition: transform 0.2s, background 0.2s;
+        }
+        .danger-button:hover {
+            background: #cc0000;
+            transform: scale(1.1);
+        }
+        .changed {
+            background-color: #ffeb3b;
+        }
+    </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const inputs = document.querySelectorAll('input[type="text"], input[type="checkbox"]');
+            inputs.forEach(input => {
+                input.addEventListener('input', function() {
+                    if (input.type === 'checkbox') {
+                        if (input.checked != input.dataset.default) {
+                            input.classList.add('changed');
+                        } else {
+                            input.classList.remove('changed');
+                        }
+                    } else {
+                        if (input.value != input.dataset.default) {
+                            input.classList.add('changed');
+                        } else {
+                            input.classList.remove('changed');
+                        }
+                    }
+                });
+            });
+        });
+
+        async function start() {
+            return fetch('/api?start');
+        }
+
+        async function stop() {
+            return fetch('/api?stop');
+        }
+
+        async function applySettings() {
+            
+        }
+    </script>
 </head>
 <body>
-    <h1>Pico httpd example</h1>
-    <p><!--#welcome--></p>
-    <p>Uptime is <!--#uptime--> seconds</p>
-    <p><a href="/?test">CGI test</a></p>
-    <p>Led is <!--#ledstate--> click <a href="/?toggleled">here</a> to toggle the led
+    <h1>Liniowir</h1>
+
+    <div>
+        <h2>Controls</h2>
+        <div style="display: flex; gap: 10px;">
+            <button class="danger-button" type="button" onclick="start()">Start</button>
+            <button class="danger-button" type="button" onclick="stop()">Stop</button>
+        </div>
+
+        <h2>Tuning</h2>
+        <label for="forward_speed">Forward Speed:</label>
+        <div><!--#fsp--></div>
+        <input type="text" id="forward_speed" name="forward_speed"><br>
+
+        <label for="centering_speed">Centering Speed:</label>
+        <div><!--#csp--></div>
+        <input type="text" id="centering_speed" name="centering_speed"><br>
+
+        <label for="rotation_kp">Rotation Kp:</label>
+        <div><!--#rkp--></div>
+        <input type="text" id="rotation_kp" name="rotation_kp"><br>
+
+        <div class="submit-container">
+            <input class="danger-button" type="button" value="Apply" onclick="applySettings()">
+        </div>
+    </div>
 </body>
 </html>

@@ -11,35 +11,34 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
+#include "liniowir.h"
+
 void httpd_init(void);
 
 static absolute_time_t wifi_connected_time;
-static bool led_on = false;
 
-static const char *cgi_handler_test(__unused int iIndex, __unused int iNumParams, char *pcParam[], __unused char *pcValue[])
+static const char *cgi_handler_api(__unused int iIndex, __unused int iNumParams, char *pcParam[], __unused char *pcValue[])
 {
-    if (!strcmp(pcParam[0], "test"))
+    if (!strcmp(pcParam[0], "start"))
     {
-        return "/test.shtml";
+        liniowir_set_enabled(true);
     }
-    else if (strcmp(pcParam[0], "toggleled") == 0)
+    else if (!strcmp(pcParam[0], "stop"))
     {
-        led_on = !led_on;
-        cyw43_gpio_set(&cyw43_state, 0, led_on);
+        liniowir_set_enabled(false);
     }
     return "/index.shtml";
 }
 
 static tCGI cgi_handlers[] = {
-    {"/", cgi_handler_test},
-    {"/index.shtml", cgi_handler_test},
+    {"/api", cgi_handler_api},
 };
 
 // Note that the buffer size is limited by LWIP_HTTPD_MAX_TAG_INSERT_LEN, so use LWIP_HTTPD_SSI_MULTIPART to return larger amounts of data
 static u16_t ssi_example_ssi_handler(int iIndex, char *pcInsert, int iInsertLen
 #if LWIP_HTTPD_SSI_MULTIPART
                                      ,
-                                     uint16_t current_tag_part, uint16_t *next_tag_part
+                                     __unused uint16_t current_tag_part, __unused uint16_t *next_tag_part
 #endif
 )
 {
@@ -47,38 +46,26 @@ static u16_t ssi_example_ssi_handler(int iIndex, char *pcInsert, int iInsertLen
     switch (iIndex)
     {
     case 0:
-    { /* "status" */
-        printed = snprintf(pcInsert, iInsertLen, "Pass");
-        break;
-    }
-    case 1:
-    { /* "welcome" */
-        printed = snprintf(pcInsert, iInsertLen, "Hello from Pico");
-        break;
-    }
-    case 2:
     { /* "uptime" */
         uint64_t uptime_s = absolute_time_diff_us(wifi_connected_time, get_absolute_time()) / 1e6;
         printed = snprintf(pcInsert, iInsertLen, "%" PRIu64, uptime_s);
         break;
     }
+    case 1:
+    { /* "forward_speed" */
+        printed = snprintf(pcInsert, iInsertLen, "%.3f", liniowir_get_forward_speed());
+        break;
+    }
+    case 2:
+    { /* "centering_speed" */
+        printed = snprintf(pcInsert, iInsertLen, "%.3f", liniowir_get_centering_speed());
+        break;
+    }
     case 3:
-    { // "ledstate"
-        printed = snprintf(pcInsert, iInsertLen, "%s", led_on ? "ON" : "OFF");
+    { /* "rotation_kp" */
+        printed = snprintf(pcInsert, iInsertLen, "%.3f", liniowir_get_rotation_kp());
         break;
     }
-#if LWIP_HTTPD_SSI_MULTIPART
-    case 4:
-    { /* "table" */
-        printed = snprintf(pcInsert, iInsertLen, "<tr><td>This is table row number %d</td></tr>", current_tag_part + 1);
-        // Leave "next_tag_part" unchanged to indicate that all data has been returned for this tag
-        if (current_tag_part < 9)
-        {
-            *next_tag_part = current_tag_part + 1;
-        }
-        break;
-    }
-#endif
     default:
     { /* unknown tag */
         printed = 0;
@@ -90,11 +77,10 @@ static u16_t ssi_example_ssi_handler(int iIndex, char *pcInsert, int iInsertLen
 
 // Be aware of LWIP_HTTPD_MAX_TAG_NAME_LEN
 static const char *ssi_tags[] = {
-    "status",
-    "welcome",
     "uptime",
-    "ledstate",
-    "table",
+    "fsp",
+    "csp",
+    "rkp",
 };
 
 void picow_httpd_start(void)

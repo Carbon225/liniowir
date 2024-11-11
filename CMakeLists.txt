@@ -24,7 +24,10 @@ add_executable(main
     ${CMAKE_CURRENT_LIST_DIR}/src/network/httpd/picow_httpd.c
 )
 
-target_include_directories(main PUBLIC ${CMAKE_CURRENT_LIST_DIR}/src/config)
+target_include_directories(main PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/src/config
+    ${CMAKE_CURRENT_LIST_DIR}/src/include
+)
 
 target_link_libraries(main
     pico_stdlib

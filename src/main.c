@@ -9,7 +9,9 @@
 #include "hardware/watchdog.h"
 #include "hardware/i2c.h"
 #include "pico/multicore.h"
+#include "pico/sync.h"
 
+#include "liniowir.h"
 #include "motors.h"
 #include "sensors.h"
 #include "imu.h"
@@ -25,6 +27,12 @@
 
 #define SENSOR_OVERSAMPLING 3
 #define SENSOR_THRESHOLD 400
+
+static critical_section_t settings_cs;
+static bool settings_enabled = false;
+static float settings_forward_speed = 0.4f;
+static float settings_centering_speed = 0.5f;
+static float settings_rotation_kp = 0.01f;
 
 static int wrap_idx(int idx)
 {
@@ -116,8 +124,71 @@ static void decide_direction(float *x, float *y, const uint32_t *pulse_lengths_u
 
     float cxx = cx * cosf(-(angle - ((float) M_PI_2))) - cy * sinf(-(angle - ((float) M_PI_2)));
 
-    *x = cosf(angle) * 0.4f + cxx * cosf(angle - ((float) M_PI_2)) * 0.5f;
-    *y = sinf(angle) * 0.4f + cxx * sinf(angle - ((float) M_PI_2)) * 0.5f;
+    float forward_speed = liniowir_get_forward_speed();
+    float centering_speed = liniowir_get_centering_speed();
+
+    *x = cosf(angle) * forward_speed + cxx * cosf(angle - ((float) M_PI_2)) * centering_speed;
+    *y = sinf(angle) * forward_speed + cxx * sinf(angle - ((float) M_PI_2)) * centering_speed;
+}
+
+void liniowir_set_enabled(bool enabled)
+{
+    critical_section_enter_blocking(&settings_cs);
+    settings_enabled = enabled;
+    critical_section_exit(&settings_cs);
+}
+
+bool liniowir_get_enabled(void)
+{
+    critical_section_enter_blocking(&settings_cs);
+    bool enabled = settings_enabled;
+    critical_section_exit(&settings_cs);
+    return enabled;
+}
+
+void liniowir_set_forward_speed(float speed)
+{
+    critical_section_enter_blocking(&settings_cs);
+    settings_forward_speed = speed;
+    critical_section_exit(&settings_cs);
+}
+
+float liniowir_get_forward_speed(void)
+{
+    critical_section_enter_blocking(&settings_cs);
+    float speed = settings_forward_speed;
+    critical_section_exit(&settings_cs);
+    return speed;
+}
+
+void liniowir_set_centering_speed(float speed)
+{
+    critical_section_enter_blocking(&settings_cs);
+    settings_centering_speed = speed;
+    critical_section_exit(&settings_cs);
+}
+
+float liniowir_get_centering_speed(void)
+{
+    critical_section_enter_blocking(&settings_cs);
+    float speed = settings_centering_speed;
+    critical_section_exit(&settings_cs);
+    return speed;
+}
+
+void liniowir_set_rotation_kp(float kp)
+{
+    critical_section_enter_blocking(&settings_cs);
+    settings_rotation_kp = kp;
+    critical_section_exit(&settings_cs);
+}
+
+float liniowir_get_rotation_kp(void)
+{
+    critical_section_enter_blocking(&settings_cs);
+    float kp = settings_rotation_kp;
+    critical_section_exit(&settings_cs);
+    return kp;
 }
 
 static void core1_main()
@@ -151,14 +222,22 @@ static void core1_main()
         sleep_ms(10);
         watchdog_update();
     }
-    printf("Button pressed!\n");
-#endif
-
+    liniowir_set_enabled(true);
+    printf("Button pressed\n");
     for (int i = 0; i < 20; i++)
     {
         sleep_ms(50);
         watchdog_update();
     }
+#else
+    printf("Waiting for enable...\n");
+    while (!liniowir_get_enabled())
+    {
+        sleep_ms(50);
+        watchdog_update();
+    }
+    printf("Enabled\n");
+#endif
 
     for (;;)
     {
@@ -172,6 +251,13 @@ static void core1_main()
             for (;;);
         }
 #endif
+
+        if (!liniowir_get_enabled())
+        {
+            printf("Stopping...\n");
+            motors_set(0.0f, 0.0f, 0.0f);
+            for (;;);
+        }
 
         imu_data_t imu_data;
         imu_read(&imu_data);
@@ -220,7 +306,7 @@ static void core1_main()
 #endif
 
         float yaw_err = 180.0f - imu_data.yaw;
-        float turn_cmd = yaw_err * 0.01f;
+        float turn_cmd = yaw_err * liniowir_get_rotation_kp();
 
         decide_direction(&x, &y, pulse_lengths_us);
         motors_set(x, y, turn_cmd);
@@ -264,6 +350,8 @@ int main()
     {
         printf("Watchdog caused reboot\n");
     }
+
+    critical_section_init(&settings_cs);
 
     i2c_init(i2c_default, 400000);
     gpio_set_function(0, GPIO_FUNC_I2C);
