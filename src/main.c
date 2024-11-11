@@ -19,6 +19,7 @@
 
 // #define DEBUG
 
+#define START_WITH_BUTTON 0
 #define DISABLE_WITH_BUTTON 0
 #define DISABLE_IN_THE_AIR 1
 
@@ -127,8 +128,6 @@ static void core1_main()
     float x = 0.0f;
     float y = 0.0f;
 
-    printf("Waiting for button press...\n");
-
     watchdog_update();
     motors_set(0.0f, 0.0f, 1.0f);
     sleep_ms(20);
@@ -140,19 +139,20 @@ static void core1_main()
     watchdog_update();
     motors_set(0.0f, 0.0f, 0.0f);
 
+#if START_WITH_BUTTON
+    printf("Waiting for button press...\n");
     while (!bootsel_button_get())
     {
         sleep_ms(10);
         watchdog_update();
     }
-
     while (bootsel_button_get())
     {
         sleep_ms(10);
         watchdog_update();
     }
-
     printf("Button pressed!\n");
+#endif
 
     for (int i = 0; i < 20; i++)
     {
