@@ -13,6 +13,7 @@
 
 #include "liniowir.h"
 #include "motors.h"
+#include "motoron/motoron_c.h"
 #include "sensors.h"
 #include "imu.h"
 #include "bootsel_button.h"
@@ -193,8 +194,8 @@ float liniowir_get_rotation_kp(void)
 
 static void core1_main()
 {
-    uint32_t pulse_lengths_us_1[APP_NUM_SENSORS] = {0};
-    uint32_t pulse_lengths_us[APP_NUM_SENSORS] = {0};
+    uint32_t sensor_values_raw[APP_NUM_SENSORS] = {0};
+    // uint32_t sensor_values_calibrated[APP_NUM_SENSORS] = {0};
 
     float x = 0.0f;
     float y = 0.0f;
@@ -262,27 +263,13 @@ static void core1_main()
         imu_data_t imu_data;
         imu_read(&imu_data);
 
-        for (int i = 0; i < APP_NUM_SENSORS; i++)
-        {
-            pulse_lengths_us[i] = 0;
-        }
-        for (int i = 0; i < SENSOR_OVERSAMPLING; i++)
-        {
-            sensors_read(pulse_lengths_us_1);
-            for (int j = 0; j < APP_NUM_SENSORS; j++)
-            {
-                if (pulse_lengths_us_1[j] > pulse_lengths_us[j])
-                {
-                    pulse_lengths_us[j] = pulse_lengths_us_1[j];
-                }
-            }
-        }
+        sensors_read_oversampled(sensor_values_raw, SENSOR_OVERSAMPLING);
 
 #if DISABLE_IN_THE_AIR
         bool in_the_air = true;
         for (int i = 0; i < APP_NUM_SENSORS; i++)
         {
-            if (pulse_lengths_us[i] < 1000)
+            if (sensor_values_raw[i] < 1000)
             {
                 in_the_air = false;
                 break;
@@ -308,7 +295,10 @@ static void core1_main()
         float yaw_err = 180.0f - imu_data.yaw;
         float turn_cmd = yaw_err * liniowir_get_rotation_kp();
 
-        decide_direction(&x, &y, pulse_lengths_us);
+        decide_direction(&x, &y, sensor_values_raw);
+        x = motoron_voltage_compensate_value(x);
+        y = motoron_voltage_compensate_value(y);
+        turn_cmd = motoron_voltage_compensate_value(turn_cmd);
         motors_set(x, y, turn_cmd);
 
 #ifdef DEBUG

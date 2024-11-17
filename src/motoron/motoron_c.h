@@ -18,6 +18,8 @@ void motoron_init(motoron_t *motoron);
 
 void motoron_set_speed(motoron_t *motoron, uint8_t motor, int16_t speed);
 
+float motoron_voltage_compensate_value(float value);
+
 #ifdef __cplusplus
 }
 #endif
